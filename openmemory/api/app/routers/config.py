@@ -6,6 +6,9 @@ from app.utils.memory import reset_memory_client
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 router = APIRouter(prefix="/api/v1/config", tags=["config"])
 
@@ -47,29 +50,47 @@ class ConfigSchema(BaseModel):
     mem0: Optional[Mem0Config] = None
 
 def get_default_configuration():
-    """Get the default configuration with sensible defaults for LLM and embedder."""
+    """Get the default configuration from environment variables."""
+    llm_provider = os.getenv("LLM_PROVIDER", "openai")
+    llm_model = os.getenv("LLM_MODEL", "gpt-4o-mini")
+    llm_api_key = os.getenv("LLM_API_KEY", "env:OPENAI_API_KEY")
+    llm_base_url = os.getenv("LLM_BASE_URL", None)
+    
+    embedder_provider = os.getenv("EMBEDDER_PROVIDER", "openai")
+    embedder_model = os.getenv("EMBEDDER_MODEL", "text-embedding-3-small")
+    embedder_base_url = os.getenv("EMBEDDER_BASE_URL", None)
+
     return {
         "openmemory": {
             "custom_instructions": None
         },
         "mem0": {
             "llm": {
-                "provider": "openai",
+                "provider": llm_provider,
                 "config": {
-                    "model": "gpt-4o-mini",
+                    "model": llm_model,
                     "temperature": 0.1,
                     "max_tokens": 2000,
-                    "api_key": "env:OPENAI_API_KEY"
+                    "api_key": f"env:LLM_API_KEY"
                 }
             },
             "embedder": {
-                "provider": "openai",
+                "provider": embedder_provider,
                 "config": {
-                    "model": "text-embedding-3-small",
-                    "api_key": "env:OPENAI_API_KEY"
+                    "model": embedder_model,
+                    "api_key": None,
+                    "ollama_base_url": embedder_base_url
                 }
             },
-            "vector_store": None
+            "vector_store": {
+                "provider": "qdrant",
+                "config": {
+                    "collection_name": "openmemory",
+                    "host": "mem0_store",
+                    "port": 6333,
+                    "embedding_model_dims": int(os.getenv("EMBEDDING_DIMS", "768"))
+                }
+            }
         }
     }
 
